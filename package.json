@@ -1,0 +1,17 @@
+{
+  "name": "esbuild-plugin-class-modules",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Inqnuam",
+  "license": "MIT",
+  "homepage": "https://github.com/inqnuam/esbuild-plugin-class-modules",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inqnuam/esbuild-plugin-class-modules.git"
+  },
+  "dependencies": {
+    "postcss": "^8.4.17",
+    "postcss-modules": "^5.0.0",
+    "sass": "^1.55.0"
+  }
+}
