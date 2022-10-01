@@ -30,7 +30,12 @@ module.exports = (config = defaultParams) => {
     setup: (build) => {
       build.initialOptions.metafile = true;
       const minify = build.initialOptions.minify;
+
       build.onEnd(async (endRes) => {
+        if (!cssBuilds.size) {
+          return;
+        }
+
         const outputs = endRes.metafile?.outputs;
 
         if (!outputs) {
@@ -46,20 +51,22 @@ module.exports = (config = defaultParams) => {
 
           const { inputs } = outputs[o];
 
-          let cssContent = Object.keys(inputs)
+          const cssContent = Object.keys(inputs)
             .filter((x) => filter.test(x))
             .map((x) => cssBuilds.get(x)?.value)
             .filter(Boolean)
             .join("\n");
 
-          await build.esbuild.build({
-            stdin: {
-              contents: cssContent,
-              loader: "css",
-            },
-            minify: minify,
-            outfile: cssFilePath,
-          });
+          if (cssContent.length) {
+            await build.esbuild.build({
+              stdin: {
+                contents: cssContent,
+                loader: "css",
+              },
+              minify: minify,
+              outfile: cssFilePath,
+            });
+          }
         };
 
         const jsOutputs = Object.keys(outputs).filter((o) => javascript.test(o));
