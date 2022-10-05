@@ -53,7 +53,21 @@ module.exports = (config = defaultParams): Plugin => {
           return;
         }
 
-        const builders = async (o) => {
+        const builders = async (cssFilePath: string, cssContent: string) => {
+          if (cssContent.length) {
+            await build.esbuild.build({
+              stdin: {
+                contents: cssContent,
+                loader: "css",
+              },
+              minify: minify,
+              outfile: cssFilePath,
+            });
+          }
+        };
+
+        let cssFiles: any = {};
+        const mergeSameCss = (o: string) => {
           const jsOutputPath = path.resolve(cwd, o);
           const parsedPath = path.parse(jsOutputPath);
 
@@ -68,21 +82,17 @@ module.exports = (config = defaultParams): Plugin => {
             .filter(Boolean)
             .join("\n");
 
-          if (cssContent.length) {
-            await build.esbuild.build({
-              stdin: {
-                contents: cssContent,
-                loader: "css",
-              },
-              minify: minify,
-              outfile: cssFilePath,
-            });
+          if (cssFiles[cssFilePath]) {
+            cssFiles[cssFilePath] += cssContent;
+          } else {
+            cssFiles[cssFilePath] = cssContent;
           }
         };
 
         const jsOutputs = Object.keys(outputs).filter((o) => javascript.test(o));
 
-        await Promise.all(jsOutputs.map((o) => builders(o)));
+        jsOutputs.forEach(mergeSameCss);
+        await Promise.all(Object.keys(cssFiles).map((o) => builders(o, cssFiles[o])));
       });
 
       build.onResolve({ filter: filter, namespace: "file" }, async (args) => {
