@@ -1,7 +1,7 @@
 {
   "name": "esbuild-plugin-class-modules",
   "version": "1.0.2",
-  "main": "src/index.js",
+  "main": "dist/index.js", 
   "author": "Inqnuam",
   "license": "MIT",
   "homepage": "https://github.com/inqnuam/esbuild-plugin-class-modules",
@@ -13,5 +13,14 @@
     "postcss": "^8.4.17",
     "postcss-modules": "^5.0.0",
     "sass": "^1.55.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.8.1",
+    "esbuild": "^0.15.10",
+    "typescript": "^4.8.4"
+  },
+  "scripts": {
+    "build": "node ./build.js",
+    "dev": "DEV=true node ./build.js"
   }
 }

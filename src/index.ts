@@ -1,8 +1,12 @@
-const sass = require("sass");
-const postcss = require("postcss");
-const cssModules = require("postcss-modules");
-const { stat } = require("fs/promises");
-const path = require("path");
+import { compile } from "sass";
+import postcss from "postcss";
+import cssModules from "postcss-modules";
+import { stat } from "fs/promises";
+import path from "path";
+
+import type { AcceptedPlugin } from "postcss";
+import type { Options } from "sass";
+import type { Plugin } from "esbuild";
 
 const cwd = process.cwd();
 const pluginNamespace = "inqnuam-sass-ns"; // to coexist with other plugins
@@ -11,19 +15,26 @@ const javascript = /\.(m|c)?js$/;
 
 // TODO: add control on more options
 // add sourcemaps
-const defaultParams = {
-  filter: /(\.modules?)?\.(s)?css$/i,
+
+export interface IClassModulesConfig {
+  filter: RegExp;
+  options: {
+    sass?: Options<"sync">;
+    postcss?: AcceptedPlugin[];
+  };
+}
+
+const defaultParams: IClassModulesConfig = {
+  filter: /(\.modules?)?\.((s)?css|sass)$/i,
   options: {
     sass: {},
+    postcss: [],
   },
 };
 
 const cssBuilds = new Map();
 
-/**
- * @type {import('esbuild').Plugin}
- */
-module.exports = (config = defaultParams) => {
+module.exports = (config = defaultParams): Plugin => {
   let filter = config.filter ?? defaultParams.filter;
   return {
     name: "inqnuam-sass-plugin",
@@ -96,12 +107,12 @@ module.exports = (config = defaultParams) => {
         }
 
         if (!cached) {
-          const result = sass.compile(args.path, config.options.sass);
+          const result = compile(args.path, config.options.sass);
 
           let jsonContent = "";
           const { css } = await postcss([
             cssModules({
-              getJSON(_, json) {
+              getJSON(error, json) {
                 jsonContent = JSON.stringify(json);
               },
             }),
