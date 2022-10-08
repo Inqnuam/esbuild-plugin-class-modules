@@ -12,6 +12,9 @@ const cwd = process.cwd();
 const pluginNamespace = "inqnuam-sass-ns"; // to coexist with other plugins
 
 const javascript = /\.(m|c)?js$/;
+const importers = /@import (url\(|").*;$/gm;
+const fontFaces = /@font-face[^{]*{([^{}]|{[^{}]*})*}/gm;
+const inputsFilter = /\.(m|c)?(j|t)sx?$/;
 
 // TODO: add control on more options
 // add sourcemaps
@@ -62,17 +65,26 @@ module.exports = (config = defaultParams): Plugin => {
 
           const { inputs } = outputs[o];
 
-          const cssContent = Object.keys(inputs)
-            .filter((x) => filter.test(x))
-            .map((x) => cssBuilds.get(x)?.value)
-            .filter(Boolean)
-            .join("\n");
+          const importclauses = Object.keys(inputs).filter((x) => inputsFilter.test(x));
+          const inputFiles = [];
+          importclauses.forEach((x) => {
+            inputFiles.push(...endRes.metafile.inputs[x]?.imports.filter((x) => x.path.startsWith(pluginNamespace)).map((x) => x.path));
+          });
 
-          if (cssContent.length) {
+          const cssFiles = Array.from(new Set(inputFiles))
+            .map((x) => cssBuilds.get(x))
+            .filter(Boolean);
+
+          if (cssFiles.length) {
+            const imports = Array.from(new Set(cssFiles.map((x) => x.imports?.join("\n")).filter(Boolean))).join("\n");
+            const fonts = Array.from(new Set(cssFiles.map((x) => x.fonts?.join("\n")).filter(Boolean))).join("\n");
             await build.esbuild.build({
               stdin: {
-                contents: cssContent,
+                contents: cssFiles.map((x) => x.value).join("\n"),
                 loader: "css",
+              },
+              banner: {
+                css: `@charset "UTF-8";\n${imports}\n${fonts}`,
               },
               minify: minify,
               outfile: cssFilePath,
@@ -87,6 +99,7 @@ module.exports = (config = defaultParams): Plugin => {
 
       build.onResolve({ filter: filter, namespace: "file" }, async (args) => {
         const fileDir = path.resolve(args.resolveDir, args.path);
+
         return {
           path: fileDir,
           namespace: pluginNamespace,
@@ -107,7 +120,7 @@ module.exports = (config = defaultParams): Plugin => {
         }
 
         if (!cached) {
-          const result = compile(args.path, config.options.sass);
+          const result = compile(args.path, { ...config.options.sass, charset: false });
 
           let jsonContent = "";
           const { css } = await postcss([
@@ -121,12 +134,27 @@ module.exports = (config = defaultParams): Plugin => {
             map: false,
           });
 
+          let cssContent = css;
+
+          const imports = cssContent.match(importers);
+          if (imports) {
+            cssContent = cssContent.replace(importers, "");
+          }
+
+          const fonts = cssContent.match(fontFaces);
+
+          if (fonts) {
+            cssContent = cssContent.replace(fontFaces, "");
+          }
+
           cached = {
             mtimeMs: Date.now(),
-            value: css,
+            value: cssContent,
             json: jsonContent,
+            fonts: fonts?.map((f) => f.replace(/\s/g, "")),
+            imports,
           };
-          cssBuilds.set(cachePath, { mtimeMs: Date.now(), value: css, json: jsonContent });
+          cssBuilds.set(cachePath, cached);
         }
 
         return {
