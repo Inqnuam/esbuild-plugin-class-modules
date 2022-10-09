@@ -4,9 +4,8 @@ import cssModules from "postcss-modules";
 import { stat } from "fs/promises";
 import path from "path";
 
-import type { AcceptedPlugin } from "postcss";
-import type { Options } from "sass";
 import type { Plugin } from "esbuild";
+import type { IClassModulesConfig } from "./index.d";
 
 const cwd = process.cwd();
 const pluginNamespace = "inqnuam-sass-ns"; // to coexist with other plugins
@@ -15,30 +14,39 @@ const javascript = /\.(m|c)?js$/;
 const importers = /@import (url\(|").*;$/gm;
 const fontFaces = /@font-face[^{]*{([^{}]|{[^{}]*})*}/gm;
 const inputsFilter = /\.(m|c)?(j|t)sx?$/;
+const emptyDeclaration = /[^{};\n\r]*{([^{}]|{[^{}]*})}/gm;
+const globalCss = /\.global\.(s?css|sass)$/;
 
 // TODO: add control on more options
 // add sourcemaps
-
-export interface IClassModulesConfig {
-  filter: RegExp;
-  options: {
-    sass?: Options<"sync">;
-    postcss?: AcceptedPlugin[];
-  };
-}
 
 const defaultParams: IClassModulesConfig = {
   filter: /(\.modules?)?\.((s)?css|sass)$/i,
   options: {
     sass: {},
     postcss: [],
+    cssModules: {
+      globalModulePaths: [globalCss],
+    },
   },
 };
 
-const cssBuilds = new Map();
+interface cacheContent {
+  mtimeMs: number;
+  value: string;
+  json: string;
+  fonts: string[];
+  imports: string[];
+}
 
-module.exports = (config = defaultParams): Plugin => {
-  let filter = config.filter ?? defaultParams.filter;
+const cssBuilds: Map<string, cacheContent> = new Map();
+
+const classModules = (config = defaultParams): Plugin => {
+  const filter = config.filter ?? defaultParams.filter;
+  const postcssPlugins = config.options?.postcss ?? [];
+  const cssModulesOptions = config.options.cssModules ?? defaultParams.options.cssModules;
+  const customGetJON = cssModulesOptions.getJSON ?? ((cssFilename: string, json: any) => {});
+
   return {
     name: "inqnuam-sass-plugin",
     setup: (build) => {
@@ -124,9 +132,12 @@ module.exports = (config = defaultParams): Plugin => {
 
           let jsonContent = "";
           const { css } = await postcss([
+            ...postcssPlugins,
             cssModules({
-              getJSON(error, json) {
+              ...cssModulesOptions,
+              getJSON(cssFilename, json) {
                 jsonContent = JSON.stringify(json);
+                customGetJON(cssFilename, json);
               },
             }),
           ]).process(result.css, {
@@ -165,3 +176,5 @@ module.exports = (config = defaultParams): Plugin => {
     },
   };
 };
+
+module.exports = classModules;
