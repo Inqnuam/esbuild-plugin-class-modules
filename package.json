@@ -1,6 +1,6 @@
 {
   "name": "esbuild-plugin-class-modules",
-  "version": "1.0.6",
+  "version": "2.0.0-alpha.0",
   "main": "dist/index.js",
   "typings": "./dist/index.d.ts",
   "author": "Inqnuam",
@@ -10,16 +10,24 @@
     "type": "git",
     "url": "git+https://github.com/inqnuam/esbuild-plugin-class-modules.git"
   },
-  "keywords": ["esbuild", "plugin", "sass", "class", "css", "style", "module"],
+  "keywords": [
+    "esbuild",
+    "plugin",
+    "sass",
+    "class",
+    "css",
+    "style",
+    "module"
+  ],
   "dependencies": {
-    "postcss": "^8.4.17",
-    "postcss-modules": "^5.0.0",
-    "sass": "^1.55.0"
+    "postcss": "^8.4.19",
+    "postcss-modules": "^6.0.0",
+    "sass": "^1.56.1"
   },
   "devDependencies": {
     "@types/node": "^18.8.1",
-    "esbuild": "^0.15.10",
-    "typescript": "^4.8.4"
+    "esbuild": "^0.15.18",
+    "typescript": "^4.9.4"
   },
   "scripts": {
     "build": "node ./build.js && cp ./src/index.d.ts ./dist/index.d.ts",
