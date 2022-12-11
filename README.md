@@ -28,7 +28,7 @@ esbuild
   .catch(() => process.exit(1));
 ```
 
-You can also set additionalHelpers and precompileOptions:
+You can also customize Sass compiler, PostCSS and CssModules options.
 
 ```js
 const cssCompilerOptions = {

@@ -14,57 +14,71 @@ const javascript = /\.(m|c)?js$/;
 const importers = /@import (url\(|").*;$/gm;
 const fontFaces = /@font-face[^{]*{([^{}]|{[^{}]*})*}/gm;
 const inputsFilter = /\.(m|c)?(j|t)sx?$/;
-const emptyDeclaration = /[^{};\n\r]*{([^{}]|{[^{}]*})}/gm;
 const globalCss = /\.global\.(s?css|sass)$/;
 const importFrom = /(^|(\s*))import\s*((".*")|('.*'))/g;
 const requireFrom = /.*require\s?\((\s*(\s*?".*"\s*?)|(\s*'.*'\s*?))\s*?\)/g;
 // TODO: add control on more options
 // add sourcemaps
 
-const parsedFiles: Map<string, string[]> = new Map();
+interface IParsedFile {
+  mtimeMs: number;
+  globalImport: string[];
+}
+const parsedFiles: Map<string, IParsedFile> = new Map();
 
 const importsForGlobalScope = async (importer: string, from: string) => {
+  let isOutdatedContent = false;
+  let isGlobalScoped = false;
+  const { mtimeMs } = await stat(importer);
   const parsedFile = parsedFiles.get(importer);
 
-  if (parsedFile) {
-    return parsedFile.includes(from);
+  if (!parsedFile || mtimeMs > parsedFile.mtimeMs) {
+    if (parsedFile) {
+      isOutdatedContent = mtimeMs > parsedFile.mtimeMs;
+    }
+    const importerContent = await readFile(importer, { encoding: "utf-8" });
+
+    const foundImports = importerContent.match(importFrom);
+    const foundRequires = importerContent.match(requireFrom);
+
+    let globalImport = [];
+    if (foundImports) {
+      globalImport = foundImports
+        .map((x) => x.trim())
+        .filter((x) => x && !x.startsWith("//"))
+        .map(
+          (x) =>
+            x
+              .split("import")
+              .filter(Boolean)
+              .map((x) => x.trim().replace(/"|'/g, ""))[0]
+        )
+        .filter(Boolean);
+    }
+
+    if (foundRequires) {
+      const cleanedRequires = foundRequires
+        .filter((x) => !x.includes("="))
+        .map(
+          (x) =>
+            x
+              .split("require")
+              .filter(Boolean)
+              .map((x) => x.replace(/\("|\('|'\)|"\)/g, ""))[0]
+        )
+        .filter(Boolean);
+
+      globalImport = globalImport.concat(cleanedRequires);
+    }
+    parsedFiles.set(importer, { mtimeMs, globalImport });
+    isGlobalScoped = globalImport.includes(from);
+  } else {
+    isGlobalScoped = parsedFile.globalImport.includes(from);
   }
-  const importerContent = await readFile(importer, { encoding: "utf-8" });
-
-  const foundImports = importerContent.match(importFrom);
-  const foundRequires = importerContent.match(requireFrom);
-
-  let globalImport = [];
-  if (foundImports) {
-    globalImport = foundImports
-      .map((x) => x.trim())
-      .filter((x) => x && !x.startsWith("//"))
-      .map(
-        (x) =>
-          x
-            .split("import")
-            .filter(Boolean)
-            .map((x) => x.trim().replace(/"|'/g, ""))[0]
-      )
-      .filter(Boolean);
-  }
-
-  if (foundRequires) {
-    const cleanedRequires = foundRequires
-      .filter((x) => !x.includes("="))
-      .map(
-        (x) =>
-          x
-            .split("require")
-            .filter(Boolean)
-            .map((x) => x.replace(/\("|\('|'\)|"\)/g, ""))[0]
-      )
-      .filter(Boolean);
-
-    globalImport = globalImport.concat(cleanedRequires);
-  }
-  parsedFiles.set(importer, globalImport);
-  return globalImport.includes(from);
+  return {
+    isOutdatedContent,
+    isGlobalScoped,
+  };
 };
 
 const defaultParams: IClassModulesConfig = {
@@ -208,21 +222,23 @@ const classModules = (config = defaultParams): Plugin => {
         }
 
         let isGlobal = false;
+        let isOutdated = false;
         if (args.importer) {
-          isGlobal = await importsForGlobalScope(args.importer, args.path);
+          const { isOutdatedContent, isGlobalScoped } = await importsForGlobalScope(args.importer, args.path);
+          isOutdated = isOutdatedContent;
+          isGlobal = isGlobalScoped;
         }
 
-        const resolvePaths = [];
+        let resolvePaths: string[] = [];
 
-        if (args.path.startsWith("@")) {
-          resolvePaths.push(cwd, "node_modules");
-        } else if (args.path.startsWith("node_modules")) {
-          resolvePaths.push(cwd);
+        if (args.path.startsWith("/")) {
+          resolvePaths = [args.path];
+        } else if (args.path.startsWith(".")) {
+          resolvePaths = [args.resolveDir, args.path];
         } else {
-          resolvePaths.push(args.resolveDir);
+          resolvePaths = [cwd, "node_modules", args.path];
         }
 
-        resolvePaths.push(args.path);
         const fileDir = path.resolve(...resolvePaths);
 
         return {
@@ -232,6 +248,7 @@ const classModules = (config = defaultParams): Plugin => {
           pluginData: {
             kind: args.kind,
             isGlobal,
+            isOutdated,
           },
         };
       });
@@ -243,7 +260,7 @@ const classModules = (config = defaultParams): Plugin => {
         const lastModifiedTime = (await stat(args.path)).mtimeMs;
 
         const isGlobal = args.pluginData.kind == "entry-point" || args.pluginData.isGlobal;
-        if (lastModifiedTime > cached?.mtimeMs) {
+        if (args.pluginData.isOutdated || lastModifiedTime > cached?.mtimeMs) {
           cssBuilds.delete(cachePath);
           cached = null;
         }
