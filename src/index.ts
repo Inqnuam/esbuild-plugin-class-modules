@@ -297,24 +297,26 @@ const classModules = (config = defaultParams): Plugin => {
 
           let cssContent = css;
 
-          const imports = cssContent.match(importers);
+          let imports = cssContent.match(importers);
           if (imports) {
             cssContent = cssContent.replace(importers, "");
           }
 
-          const fonts = cssContent.match(fontFaces);
+          let fonts = cssContent.match(fontFaces);
           if (fonts) {
             cssContent = cssContent.replace(fontFaces, "");
           }
 
+          const uniqueFonts = Array.from(new Set(fonts?.map((f) => f.replace(/\s/g, ""))));
+          const uniqueImports = Array.from(new Set(imports));
           cached = {
             mtimeMs: Date.now(),
             value: cssContent,
             pure: pureCss,
             json: jsonContent,
-            fonts: fonts?.map((f) => f.replace(/\s/g, "")),
+            fonts: uniqueFonts,
             kind: args.pluginData.kind,
-            imports,
+            imports: uniqueImports,
           };
           cssBuilds.set(cachePath, cached);
         }
