@@ -81,3 +81,33 @@ By default any file ending with `.global.css scss etc.` is considered as global.
 To customize this behavior set `globalModulePaths` into plugins `cssModules`.  
 Default is `[/\.global\.(s?css|sass)$/]`.  
 See [CSS Modules](https://github.com/css-modules/css-modules) for more info.
+
+Another way to declare class names as global scoped is to use nameless import/require.  
+Ex:
+```javascript
+import "./myAwsomeStyles.scss"
+```
+or as local scoped with named import/require:
+```javascript
+import style from "./myAwsomeStyles.scss"
+```
+
+### Usage with multiple css processor plugins
+For better compatibility with other css processors it's prefered to put `esbuild-plugin-class-modules` at after all other css plugins in your esbuild config.
+
+```js
+const esbuild = require("esbuild");
+const lessCssPlugin = require("some-less-processor-plugin");
+const classModules = require("esbuild-plugin-class-modules");
+
+
+esbuild
+  .build({
+    entryPoints: ["input.js"],
+    outdir: "public",
+    bundle: true,
+    plugins: [lessCssPlugin, classModules()],
+  })
+  .then((result) => console.log(result))
+  .catch(() => process.exit(1));
+```

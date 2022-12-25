@@ -13,12 +13,11 @@ const pluginNamespace = "inqnuam-sass-ns"; // to coexist with other plugins
 const javascript = /\.(m|c)?js$/;
 const importers = /@import (url\(|").*;$/gm;
 const fontFaces = /@font-face[^{]*{([^{}]|{[^{}]*})*}/gm;
-const inputsFilter = /\.(m|c)?(j|t)sx?$/;
+const inputsFilter = /\.((m|c)?(j|t)sx?|svelte|vue)$/;
 const globalCss = /\.global\.(s?css|sass)$/;
 const importFrom = /(^|(\s*))import\s*((".*")|('.*'))/g;
 const requireFrom = /.*require\s?\((\s*(\s*?".*"\s*?)|(\s*'.*'\s*?))\s*?\)/g;
-// TODO: add control on more options
-// add sourcemaps
+// TODO: add sourcemaps
 
 interface IParsedFile {
   mtimeMs: number;
@@ -107,7 +106,7 @@ const cssBuilds: Map<string, cacheContent> = new Map();
 const classModules = (config = defaultParams): Plugin => {
   const filter = config.filter ?? defaultParams.filter;
   const postcssPlugins = config.options?.postcss ?? [];
-  const cssModulesOptions = config.options.cssModules ?? defaultParams.options.cssModules;
+  const cssModulesOptions = config.options?.cssModules ?? defaultParams.options.cssModules;
   const customGetJON = cssModulesOptions.getJSON ?? ((cssFilename: string, json: any) => {});
 
   return {
@@ -134,8 +133,9 @@ const classModules = (config = defaultParams): Plugin => {
           const cssFileName = parsedPath.name + ".css";
           const cssFilePath = `${parsedPath.dir}/${cssFileName}`;
 
-          const { inputs } = outputs[o];
+          const { inputs, cssBundle } = outputs[o];
 
+          const shouldMerge = cssBundle ? cssBundle == cssFilePath.replace(`${cwd}/`, "") : false;
           const importclauses = Object.keys(inputs).filter((x) => inputsFilter.test(x));
           const entryPoints = Object.keys(inputs).filter((x) => x.startsWith(pluginNamespace) && cssBuilds.get(x)?.kind == "entry-point");
 
@@ -162,10 +162,15 @@ const classModules = (config = defaultParams): Plugin => {
             if (fonts) {
               cssBanner += `\n${fonts}`;
             }
+            let cssContents = cssFiles.map((x) => (x.kind == "entry-point" ? x.pure : x.value)).join("\n");
 
+            if (shouldMerge) {
+              const fileContent = await readFile(cssFilePath, { encoding: "utf-8" });
+              cssContents += fileContent;
+            }
             await build.esbuild.build({
               stdin: {
-                contents: cssFiles.map((x) => (x.kind == "entry-point" ? x.pure : x.value)).join("\n"),
+                contents: cssContents,
                 loader: "css",
               },
               banner: {
@@ -189,10 +194,14 @@ const classModules = (config = defaultParams): Plugin => {
               if (foundEntryPointResult.fonts) {
                 cssBanner += `\n${foundEntryPointResult.fonts.join("\n")}`;
               }
-
+              let cssContents = foundEntryPointResult.pure;
+              if (shouldMerge) {
+                const fileContent = await readFile(cssFilePath, { encoding: "utf-8" });
+                cssContents += fileContent;
+              }
               await build.esbuild.build({
                 stdin: {
-                  contents: foundEntryPointResult.pure,
+                  contents: cssContents,
                   loader: "css",
                 },
                 banner: {
@@ -267,7 +276,7 @@ const classModules = (config = defaultParams): Plugin => {
 
         let pureCss = "";
         if (!cached) {
-          const result = compile(args.path, { ...config.options.sass, charset: false });
+          const result = compile(args.path, { ...config.options?.sass, charset: false });
           pureCss = result.css;
 
           let jsonContent = "";
