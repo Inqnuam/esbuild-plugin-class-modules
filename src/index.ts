@@ -179,6 +179,10 @@ const classModules = (config = defaultParams): Plugin => {
               minify: minify,
               outfile: cssFilePath,
             });
+
+            if (!shouldMerge) {
+              outputs[o].cssBundle = cssFilePath.replace(`${cwd}/`, "");
+            }
           }
 
           if (entryPoints.length) {
