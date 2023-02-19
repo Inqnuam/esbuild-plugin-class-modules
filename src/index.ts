@@ -1,23 +1,19 @@
 import { compile } from "sass";
 import postcss from "postcss";
 import cssModules from "postcss-modules";
-import { stat, rm, readFile } from "fs/promises";
+import { stat, readFile } from "fs/promises";
 import path from "path";
 
 import type { Plugin } from "esbuild";
 import type { IClassModulesConfig } from "./index.d";
+import type { ProcessOptions } from "postcss";
 
 const cwd = process.cwd();
 const pluginNamespace = "inqnuam-sass-ns"; // to coexist with other plugins
 
-const javascript = /\.(m|c)?js$/;
-const importers = /@import (url\(|").*;$/gm;
-const fontFaces = /@font-face[^{]*{([^{}]|{[^{}]*})*}/gm;
-const inputsFilter = /\.((m|c)?(j|t)sx?|svelte|vue)$/;
 const globalCss = /\.global\.(s?css|sass)$/;
 const importFrom = /(^|(\s*))import\s*((".*")|('.*'))/g;
 const requireFrom = /.*require\s?\((\s*(\s*?".*"\s*?)|(\s*'.*'\s*?))\s*?\)/g;
-// TODO: add sourcemaps
 
 interface IParsedFile {
   mtimeMs: number;
@@ -96,12 +92,19 @@ interface cacheContent {
   value: string;
   pure: string;
   json: string;
-  fonts: string[];
-  imports: string[];
   kind: string;
 }
 
 const cssBuilds: Map<string, cacheContent> = new Map();
+
+const genContent = (path: string, json: string) => {
+  let content = `
+  import "${path}";
+  export default ${json};
+  `;
+
+  return content;
+};
 
 const classModules = (config = defaultParams): Plugin => {
   const filter = config.filter ?? defaultParams.filter;
@@ -112,121 +115,12 @@ const classModules = (config = defaultParams): Plugin => {
   return {
     name: "inqnuam-sass-plugin",
     setup: (build) => {
-      build.initialOptions.metafile = true;
-      const minify = build.initialOptions.minify;
-
-      build.onEnd(async (endRes) => {
-        if (!cssBuilds.size) {
-          return;
-        }
-
-        const outputs = endRes.metafile?.outputs;
-
-        if (!outputs) {
-          return;
-        }
-
-        const builders = async (o) => {
-          const jsOutputPath = path.resolve(cwd, o);
-          const parsedPath = path.parse(jsOutputPath);
-
-          const cssFileName = parsedPath.name + ".css";
-          const cssFilePath = `${parsedPath.dir}/${cssFileName}`;
-
-          const { inputs, cssBundle } = outputs[o];
-
-          const shouldMerge = cssBundle ? cssBundle == cssFilePath.replace(`${cwd}/`, "") : false;
-          const importclauses = Object.keys(inputs).filter((x) => inputsFilter.test(x));
-          const entryPoints = Object.keys(inputs).filter((x) => x.startsWith(pluginNamespace) && cssBuilds.get(x)?.kind == "entry-point");
-
-          const inputFiles = [];
-          importclauses.forEach((x) => {
-            const inlineImports = endRes.metafile.inputs[x]?.imports.filter((x) => x.path.startsWith(pluginNamespace)).map((x) => x.path);
-            inputFiles.push(...inlineImports);
-          });
-
-          const cssFiles = Array.from(new Set(inputFiles))
-            .map((x) => cssBuilds.get(x))
-            .filter(Boolean);
-
-          if (cssFiles.length) {
-            const imports = Array.from(new Set(cssFiles.map((x) => x.imports?.join("\n")).filter(Boolean))).join("\n");
-            const fonts = Array.from(new Set(cssFiles.map((x) => x.fonts?.join("\n")).filter(Boolean))).join("\n");
-
-            let cssBanner = `@charset "UTF-8";`;
-
-            if (imports) {
-              cssBanner += `\n${imports}`;
-            }
-
-            if (fonts) {
-              cssBanner += `\n${fonts}`;
-            }
-            let cssContents = cssFiles.map((x) => (x.kind == "entry-point" ? x.pure : x.value)).join("\n");
-
-            if (shouldMerge) {
-              const fileContent = await readFile(cssFilePath, { encoding: "utf-8" });
-              cssContents += fileContent;
-            }
-            await build.esbuild.build({
-              stdin: {
-                contents: cssContents,
-                loader: "css",
-              },
-              banner: {
-                css: cssBanner,
-              },
-              minify: minify,
-              outfile: cssFilePath,
-            });
-
-            if (!shouldMerge) {
-              outputs[o].cssBundle = cssFilePath.replace(`${cwd}/`, "");
-            }
-          }
-
-          if (entryPoints.length) {
-            const foundEntryPointResult = cssBuilds.get(entryPoints[0]);
-
-            if (foundEntryPointResult) {
-              let cssBanner = `@charset "UTF-8";`;
-
-              if (foundEntryPointResult.imports) {
-                cssBanner += `\n${foundEntryPointResult.imports.join("\n")}`;
-              }
-
-              if (foundEntryPointResult.fonts) {
-                cssBanner += `\n${foundEntryPointResult.fonts.join("\n")}`;
-              }
-              let cssContents = foundEntryPointResult.pure;
-              if (shouldMerge) {
-                const fileContent = await readFile(cssFilePath, { encoding: "utf-8" });
-                cssContents += fileContent;
-              }
-              await build.esbuild.build({
-                stdin: {
-                  contents: cssContents,
-                  loader: "css",
-                },
-                banner: {
-                  css: cssBanner,
-                },
-                minify: minify,
-                outfile: cssFilePath,
-              });
-
-              if (!cssModulesOptions.exportGlobals) {
-                try {
-                  await rm(jsOutputPath);
-                } catch (error) {}
-              }
-            }
-          }
+      const sourceMap = build.initialOptions.sourcemap;
+      build.onResolve({ filter: /^inqnuam-sass-ns/ }, (args) => {
+        return {
+          path: args.path,
+          namespace: pluginNamespace,
         };
-
-        const jsOutputs = Object.keys(outputs).filter((o) => javascript.test(o));
-
-        await Promise.all(jsOutputs.map((o) => builders(o)));
       });
 
       build.onResolve({ filter: filter }, async (args) => {
@@ -266,6 +160,12 @@ const classModules = (config = defaultParams): Plugin => {
         };
       });
 
+      build.onLoad({ filter: /^inqnuam-sass-ns/ }, (args) => {
+        return {
+          contents: cssBuilds.get(args.path).value,
+          loader: "css",
+        };
+      });
       build.onLoad({ filter: /.*/, namespace: pluginNamespace }, async (args) => {
         const cachePath = `${pluginNamespace}:${args.path}`;
 
@@ -280,8 +180,26 @@ const classModules = (config = defaultParams): Plugin => {
 
         let pureCss = "";
         if (!cached) {
-          const result = compile(args.path, { ...config.options?.sass, charset: false });
+          let compilerOptions = {
+            ...config.options?.sass,
+            charset: false,
+          };
+          if (sourceMap) {
+            compilerOptions.sourceMap = true;
+            compilerOptions.sourceMapIncludeSources = true;
+          }
+
+          const result = compile(args.path, compilerOptions);
+
           pureCss = result.css;
+
+          if (sourceMap) {
+            const sm = JSON.stringify(result.sourceMap);
+            const smBase64 = (Buffer.from(sm, "utf8") || "").toString("base64");
+            const smComment = "/*# sourceMappingURL=data:application/json;charset=utf-8;base64," + smBase64 + " */";
+
+            pureCss += "\n".repeat(2) + smComment;
+          }
 
           let jsonContent = "";
           let css = "";
@@ -298,10 +216,15 @@ const classModules = (config = defaultParams): Plugin => {
             cssModulesOpt.scopeBehaviour = "global";
           }
           try {
-            const { css: postCssGen } = await postcss([...postcssPlugins, cssModules(cssModulesOpt)]).process(result.css, {
+            let postCssOpt: ProcessOptions = {
               from: args.path,
-              map: false,
-            });
+            };
+            if (sourceMap) {
+              postCssOpt.map = {
+                inline: true,
+              };
+            }
+            const { css: postCssGen } = await postcss([...postcssPlugins, cssModules(cssModulesOpt)]).process(pureCss, postCssOpt);
 
             css = postCssGen;
           } catch (error) {
@@ -310,34 +233,27 @@ const classModules = (config = defaultParams): Plugin => {
 
           let cssContent = css;
 
-          let imports = cssContent.match(importers);
-          if (imports) {
-            cssContent = cssContent.replace(importers, "");
-          }
-
-          let fonts = cssContent.match(fontFaces);
-          if (fonts) {
-            cssContent = cssContent.replace(fontFaces, "");
-          }
-
-          const uniqueFonts = Array.from(new Set(fonts?.map((f) => f.replace(/\s/g, ""))));
-          const uniqueImports = Array.from(new Set(imports));
           cached = {
             mtimeMs: Date.now(),
             value: cssContent,
             pure: pureCss,
             json: jsonContent,
-            fonts: uniqueFonts,
             kind: args.pluginData.kind,
-            imports: uniqueImports,
           };
           cssBuilds.set(cachePath, cached);
         }
 
-        return {
-          contents: cached.json,
-          loader: "json",
-        };
+        if (isGlobal) {
+          return {
+            contents: cached.pure,
+            loader: "css",
+          };
+        } else {
+          return {
+            contents: genContent(cachePath, cached.json),
+            loader: "js",
+          };
+        }
       });
     },
   };

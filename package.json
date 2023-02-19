@@ -1,6 +1,6 @@
 {
   "name": "esbuild-plugin-class-modules",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "main": "dist/index.js",
   "typings": "./dist/index.d.ts",
   "author": "Inqnuam",
@@ -20,17 +20,17 @@
     "module"
   ],
   "dependencies": {
-    "postcss": "^8.4.19",
+    "postcss": "^8.4.21",
     "postcss-modules": "^5.0.0",
-    "sass": "^1.56.1"
+    "sass": "^1.58.3"
   },
   "devDependencies": {
     "@types/node": "^18.8.1",
-    "esbuild": "^0.16.10",
+    "esbuild": "^0.17.9",
     "typescript": "^4.9.4"
   },
   "scripts": {
-    "build": "node ./build.js && cp ./src/index.d.ts ./dist/index.d.ts",
-    "dev": "DEV=true node ./build.js"
+    "build": "node ./build.mjs && cp ./src/index.d.ts ./dist/index.d.ts",
+    "dev": "DEV=true node ./build.mjs"
   }
 }
