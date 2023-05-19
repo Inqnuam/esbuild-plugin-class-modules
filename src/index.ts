@@ -5,7 +5,7 @@ import { stat, readFile } from "fs/promises";
 import path from "path";
 
 import type { Plugin } from "esbuild";
-import type { IClassModulesConfig } from "./index.d";
+import type { IClassModulesConfig } from "./types";
 import type { ProcessOptions } from "postcss";
 
 const cwd = process.cwd();
@@ -106,7 +106,7 @@ const genContent = (path: string, json: string) => {
   return content;
 };
 
-const classModules = (config = defaultParams): Plugin => {
+const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
   const filter = config.filter ?? defaultParams.filter;
   const postcssPlugins = config.options?.postcss ?? [];
   const cssModulesOptions = config.options?.cssModules ?? defaultParams.options.cssModules;
@@ -156,6 +156,7 @@ const classModules = (config = defaultParams): Plugin => {
             kind: args.kind,
             isGlobal,
             isOutdated,
+            resolveDir: args.resolveDir,
           },
         };
       });
@@ -163,6 +164,7 @@ const classModules = (config = defaultParams): Plugin => {
       build.onLoad({ filter: /^inqnuam-sass-ns/ }, (args) => {
         return {
           contents: cssBuilds.get(args.path).value,
+          resolveDir: args.pluginData.resolveDir,
           loader: "css",
         };
       });
@@ -245,6 +247,7 @@ const classModules = (config = defaultParams): Plugin => {
 
         if (isGlobal) {
           return {
+            resolveDir: args.pluginData.resolveDir,
             contents: cached.pure,
             loader: "css",
           };
@@ -259,4 +262,4 @@ const classModules = (config = defaultParams): Plugin => {
   };
 };
 
-module.exports = classModules;
+export default classModules;

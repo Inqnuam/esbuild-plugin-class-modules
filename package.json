@@ -1,8 +1,16 @@
 {
   "name": "esbuild-plugin-class-modules",
-  "version": "2.1.3",
+  "version": "2.1.4",
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "typings": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    }
+  },
   "author": "Inqnuam",
   "license": "MIT",
   "homepage": "https://github.com/inqnuam/esbuild-plugin-class-modules",
@@ -20,17 +28,17 @@
     "module"
   ],
   "dependencies": {
-    "postcss": "^8.4.21",
+    "postcss": "^8.4.23",
     "postcss-modules": "^5.0.0",
-    "sass": "^1.58.3"
+    "sass": "^1.62.1"
   },
   "devDependencies": {
     "@types/node": "^18.14.0",
-    "esbuild": "^0.17.10",
-    "typescript": "^4.9.5"
+    "esbuild": "^0.17.19",
+    "typescript": "^5.0.4"
   },
   "scripts": {
-    "build": "node ./build.mjs && cp ./src/index.d.ts ./dist/index.d.ts",
+    "build": "node ./build.mjs",
     "dev": "DEV=true node ./build.mjs"
   }
 }

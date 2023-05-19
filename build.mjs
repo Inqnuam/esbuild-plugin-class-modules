@@ -1,28 +1,42 @@
 import esbuild from "esbuild";
+import { execSync } from "child_process";
 
 const shouldWatch = process.env.DEV == "true";
 
-const ctx = await esbuild[shouldWatch ? "context" : "build"]({
+const compileDeclarations = () => {
+  try {
+    execSync("tsc");
+  } catch (error) {
+    console.log(error.output?.[1]?.toString());
+  }
+};
+const external = ["esbuild", "postcss", "postcss-modules", "sass"];
+const watchPlugin = {
+  name: "watch-plugin",
+  setup: (build) => {
+    const format = build.initialOptions.format;
+    build.onEnd(async (result) => {
+      console.log("Build", format, new Date().toLocaleString());
+      compileDeclarations();
+    });
+  },
+};
+
+const commonOptions = {
   entryPoints: ["./src/index.ts"],
   platform: "node",
   format: "cjs",
   target: "ES6",
   bundle: true,
   minify: !shouldWatch,
-  external: ["esbuild", "postcss", "postcss-modules", "sass"],
+  external,
   outdir: "dist",
-  plugins: [
-    {
-      name: "dummy",
-      setup(build) {
-        build.onEnd(() => {
-          console.log("Compiler rebuild", new Date().toLocaleString());
-        });
-      },
-    },
-  ],
-});
+  plugins: [watchPlugin],
+};
 
+const cjs = await esbuild[shouldWatch ? "context" : "build"](commonOptions);
+const mjs = await esbuild[shouldWatch ? "context" : "build"]({ ...commonOptions, format: "esm", outExtension: { ".js": ".mjs" } });
 if (shouldWatch) {
-  await ctx.watch();
+  await cjs.watch();
+  await mjs.watch();
 }
