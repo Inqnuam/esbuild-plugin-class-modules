@@ -120,6 +120,9 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
         return {
           path: args.path,
           namespace: pluginNamespace,
+          pluginData: {
+            resolveDir: args.resolveDir,
+          },
         };
       });
 
@@ -164,7 +167,7 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
       build.onLoad({ filter: /^inqnuam-sass-ns/ }, (args) => {
         return {
           contents: cssBuilds.get(args.path).value,
-          resolveDir: args.pluginData.resolveDir,
+          resolveDir: args.pluginData?.resolveDir,
           loader: "css",
         };
       });
@@ -247,7 +250,7 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
 
         if (isGlobal) {
           return {
-            resolveDir: args.pluginData.resolveDir,
+            resolveDir: args.pluginData?.resolveDir,
             contents: cached.pure,
             loader: "css",
           };
@@ -255,6 +258,7 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
           return {
             contents: genContent(cachePath, cached.json),
             loader: "js",
+            resolveDir: args.pluginData?.resolveDir,
           };
         }
       });
