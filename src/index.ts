@@ -1,4 +1,5 @@
-import { compile } from "sass";
+import * as sass from "sass";
+const { compile } = sass;
 import postcss from "postcss";
 import cssModules from "postcss-modules";
 import { stat, readFile } from "fs/promises";
@@ -267,3 +268,4 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
 };
 
 export default classModules;
+export { classModules };
