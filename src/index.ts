@@ -1,5 +1,3 @@
-import * as sass from "sass";
-const { compile } = sass;
 import postcss from "postcss";
 import cssModules from "postcss-modules";
 import { stat, readFile } from "fs/promises";
@@ -115,7 +113,10 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
 
   return {
     name: "inqnuam-sass-plugin",
-    setup: (build) => {
+    setup: async (build) => {
+      // @ts-ignore
+      const sass = await import("sass");
+      const { compile } = sass.default;
       const sourceMap = build.initialOptions.sourcemap;
       build.onResolve({ filter: /^inqnuam-sass-ns/ }, (args) => {
         return {
