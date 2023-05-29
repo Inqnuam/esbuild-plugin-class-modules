@@ -15,7 +15,7 @@ npm install -D esbuild-plugin-class-modules
 
 ```js
 const esbuild = require("esbuild");
-const classModules = require("esbuild-plugin-class-modules");
+const { classModules } = require("esbuild-plugin-class-modules");
 
 esbuild
   .build({
@@ -84,22 +84,25 @@ See [CSS Modules](https://github.com/css-modules/css-modules) for more info.
 
 Another way to declare class names as global scoped is to use nameless import/require.  
 Ex:
+
 ```javascript
-import "./myAwsomeStyles.scss"
+import "./myAwsomeStyles.scss";
 ```
+
 or as local scoped with named import/require:
+
 ```javascript
-import style from "./myAwsomeStyles.scss"
+import style from "./myAwsomeStyles.scss";
 ```
 
 ### Usage with multiple css processor plugins
+
 For better compatibility with other css processors it's prefered to put `esbuild-plugin-class-modules` at after all other css plugins in your esbuild config.
 
 ```js
 const esbuild = require("esbuild");
 const lessCssPlugin = require("some-less-processor-plugin");
-const classModules = require("esbuild-plugin-class-modules");
-
+const { classModules } = require("esbuild-plugin-class-modules");
 
 esbuild
   .build({

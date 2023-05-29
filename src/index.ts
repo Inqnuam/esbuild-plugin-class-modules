@@ -161,7 +161,7 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
             kind: args.kind,
             isGlobal,
             isOutdated,
-            resolveDir: args.resolveDir,
+            resolveDir: path.dirname(fileDir),
           },
         };
       });
