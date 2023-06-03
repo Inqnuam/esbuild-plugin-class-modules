@@ -19,6 +19,7 @@ interface IParsedFile {
   globalImport: string[];
 }
 const parsedFiles: Map<string, IParsedFile> = new Map();
+const normalizePath = (p: string) => path.win32.normalize(p).replace(/\\/g, "/");
 
 const importsForGlobalScope = async (importer: string, from: string) => {
   let isOutdatedContent = false;
@@ -174,7 +175,7 @@ const classModules = (config: IClassModulesConfig = defaultParams): Plugin => {
         };
       });
       build.onLoad({ filter: /.*/, namespace: pluginNamespace }, async (args) => {
-        const cachePath = `${pluginNamespace}:${args.path}`;
+        const cachePath = normalizePath(`${pluginNamespace}:${args.path}`);
 
         let cached = cssBuilds.get(cachePath);
         const lastModifiedTime = (await stat(args.path)).mtimeMs;
